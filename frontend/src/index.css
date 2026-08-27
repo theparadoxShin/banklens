@@ -1,0 +1,7 @@
+/* Tailwind v4 — un seul import suffit */
+@import "tailwindcss";
+
+/* Styles custom globaux */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}

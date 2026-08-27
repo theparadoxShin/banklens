@@ -1,0 +1,11 @@
+# Un Namespace isole les ressources. Comme un dossier sur un disque :
+# les ressources dans "banklens" ne voient pas celles dans "default".
+# En production, on a typiquement : dev, staging, production.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banklens
+  labels:
+    app: banklens
+    # Les labels sont des tags key-value pour organiser les ressources
+    # Kubernetes les utilise pour sélectionner des groupes de ressources

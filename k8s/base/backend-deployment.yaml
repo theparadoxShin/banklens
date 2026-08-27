@@ -1,0 +1,97 @@
+# Un Deployment déclare l'ÉTAT DÉSIRÉ de ton application :
+# - Quelle image Docker utiliser
+# - Combien de replicas (copies) tu veux
+# - Quelles ressources allouer (CPU, mémoire)
+# - Comment vérifier que le pod est sain
+# Kubernetes s'assure que l'état réel correspond à l'état désiré.
+# Si un pod crashe, K8s en relance un automatiquement.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banklens-api
+  namespace: banklens
+  labels:
+    app: banklens-api
+spec:
+  replicas: 2
+  # replicas: 2 → Kubernetes maintient TOUJOURS 2 pods en fonctionnement
+  # Si un pod crashe, K8s en lance un nouveau immédiatement
+  # 2 replicas = haute disponibilité (si un node tombe, l'autre prend le relais)
+  
+  selector:
+    matchLabels:
+      app: banklens-api
+    # selector : dit au Deployment "gère les pods qui ont le label app=banklens-api"
+    # DOIT correspondre aux labels du template ci-dessous
+  
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Pendant la mise à jour, max 1 pod en PLUS des replicas
+      maxUnavailable: 0  # 0 pod indisponible pendant la mise à jour = ZERO DOWNTIME
+    # RollingUpdate : remplace les pods un par un (pas tous d'un coup)
+    # Le nouveau pod doit être "Ready" avant que l'ancien soit supprimé
+    # C'est comme ça qu'on fait du déploiement sans interruption
+  
+  template:
+    # template : le "moule" pour créer les pods
+    metadata:
+      labels:
+        app: banklens-api
+        version: "1.0.0"
+      annotations:
+        # Annotations Datadog — indiquent à l'agent Datadog comment instrumenter ce pod
+        ad.datadoghq.com/banklens-api.logs: '[{"source":"python","service":"banklens-api"}]'
+    spec:
+      containers:
+        - name: banklens-api
+          image: <AWS_ACCOUNT_ID>.dkr.ecr.ca-central-1.amazonaws.com/banklens-api:latest
+          # L'image Docker sera pushée sur ECR (Elastic Container Registry d'AWS)
+          # Tu remplaceras <AWS_ACCOUNT_ID> par ton vrai ID de compte AWS
+          
+          ports:
+            - containerPort: 8000
+              name: http
+              # Déclare que ce container écoute sur le port 8000
+          
+          envFrom:
+            - configMapRef:
+                name: banklens-config
+              # Injecte TOUTES les valeurs du ConfigMap comme variables d'env
+            - secretRef:
+                name: banklens-secrets
+              # Injecte TOUTES les valeurs du Secret comme variables d'env
+          
+          resources:
+            requests:
+              cpu: "250m"      # 250 millicores = 0.25 CPU (garanti)
+              memory: "256Mi"  # 256 MB de RAM (garanti)
+            limits:
+              cpu: "500m"      # 500 millicores = 0.5 CPU (maximum)
+              memory: "512Mi"  # 512 MB de RAM (maximum, au-delà = OOMKilled)
+            # requests : ce que K8s GARANTIT au pod (réservé sur le node)
+            # limits : ce que le pod NE PEUT PAS dépasser
+            # Si le pod dépasse la limit mémoire → K8s le tue (OOMKilled)
+            # Si le pod dépasse la limit CPU → il est throttlé (ralenti, pas tué)
+          
+          # LIVENESS PROBE : le pod est-il VIVANT ?
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15   # Attend 15s après le démarrage
+            periodSeconds: 20         # Vérifie toutes les 20s
+            failureThreshold: 3       # Après 3 échecs → redémarrage
+            # Si /health retourne un code ≥ 400 trois fois de suite,
+            # K8s considère le pod comme mort et le redémarre
+          
+          # READINESS PROBE : le pod est-il PRÊT à recevoir du trafic ?
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5    # Attend 5s
+            periodSeconds: 10         # Vérifie toutes les 10s
+            # Si /ready échoue, K8s RETIRE le pod du Service
+            # (plus de trafic envoyé) mais ne le tue PAS
+            # Utile quand le pod est vivant mais pas prêt (ex: chargement en cours)

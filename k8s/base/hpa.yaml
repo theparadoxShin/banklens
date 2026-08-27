@@ -1,0 +1,35 @@
+# Le HPA ajuste automatiquement le nombre de pods selon la charge.
+# Si le CPU dépasse 70%, il ajoute des pods. Si ça redescend, il en retire.
+# C'est le "scaling horizontal" — ajouter des INSTANCES, pas de la puissance.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: banklens-api-hpa
+  namespace: banklens
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: banklens-api
+  minReplicas: 2    # Minimum 2 pods (haute disponibilité)
+  maxReplicas: 6    # Maximum 6 pods (contrôle des coûts)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+          # Quand la moyenne CPU des pods dépasse 70%, K8s ajoute un pod
+          # Quand ça redescend sous 70%, K8s retire les pods en surplus
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      # Attend 5 minutes avant de scale down (évite le "flapping")
+      # Le flapping = scale up → scale down → scale up en boucle

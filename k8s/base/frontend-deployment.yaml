@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banklens-frontend
+  namespace: banklens
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: banklens-frontend
+  template:
+    metadata:
+      labels:
+        app: banklens-frontend
+    spec:
+      containers:
+        - name: banklens-frontend
+          image: <AWS_ACCOUNT_ID>.dkr.ecr.ca-central-1.amazonaws.com/banklens-frontend:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+            # Le frontend (Nginx servant des fichiers statiques) consomme
+            # BEAUCOUP moins de ressources que le backend
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 15

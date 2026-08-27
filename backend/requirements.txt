@@ -1,0 +1,32 @@
+#=== Framework WEB ===
+fastapi[standard]
+uvicorn
+
+#=== AI & LLM ===
+langchain-core
+langchain-aws
+boto3
+
+#== Extraction PDF ===
+pypdf
+python-multipart
+
+#=== Database ===
+sqlalchemy
+asyncpg
+alembic
+
+#=== Sécurité ===
+
+python-jose[cryptography]
+passlib[bcrypt]
+
+#=== Monitoring ===
+ddtrace
+
+#=== Utilitaires ===
+pydantic
+pydantic
+pydantic-settings
+python-dotenv
+httpx

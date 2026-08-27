@@ -1,0 +1,76 @@
+# docker-compose.yml — Orchestre tous les services localement
+# Une seule commande "docker compose up" lance tout
+#
+# CONCEPT CLÉ : Docker Compose vs Kubernetes
+# - Docker Compose : orchestration LOCALE (dev), un seul serveur
+# - Kubernetes : orchestration PRODUCTION, multiple serveurs, scaling auto
+# On utilise Compose en dev car c'est plus simple et rapide
+
+services:
+  # === Base de données PostgreSQL ===
+  db:
+    image: postgres:16-alpine
+    # postgres:16-alpine : PostgreSQL 16 sur Alpine Linux (image légère)
+    environment:
+      POSTGRES_USER: banklens
+      POSTGRES_PASSWORD: banklens_pwd
+      POSTGRES_DB: banklens_db
+    ports:
+      - "5432:5432"
+      # Expose le port 5432 sur ta machine locale
+      # Format : "PORT_HOTE:PORT_CONTAINER"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Volume nommé : les données persistent même si le container est supprimé
+      # Sans ça, tu perds ta DB à chaque "docker compose down"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U banklens -d banklens_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      # Healthcheck : Docker vérifie régulièrement que PostgreSQL est prêt
+      # Les autres services attendent que ce check passe avant de démarrer
+
+  # === Backend FastAPI ===
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://banklens:banklens_pwd@db:5432/banklens_db
+      # IMPORTANT : "db" (pas "localhost") !
+      # Dans Docker Compose, chaque service est accessible par son NOM
+      # "db" est résolu automatiquement vers l'IP du container PostgreSQL
+      - AWS_REGION=ca-central-1
+      - BEDROCK_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
+      - DD_SERVICE=banklens-api
+      - DD_ENV=development
+    volumes:
+      - ./backend/app:/app/app
+      # Monte le code source local dans le container
+      # Les modifications sont visibles immédiatement (hot reload)
+    depends_on:
+      db:
+        condition: service_healthy
+        # Attend que PostgreSQL soit HEALTHY avant de démarrer
+    env_file:
+      - ./backend/.env
+
+  # === Frontend React ===
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+    # Déclare le volume nommé pour PostgreSQL
+    # Docker le crée automatiquement et le gère

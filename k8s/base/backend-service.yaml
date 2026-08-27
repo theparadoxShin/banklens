@@ -1,0 +1,23 @@
+# Un Service donne une adresse réseau STABLE aux pods.
+# Les pods sont éphémères (ils peuvent être recréés avec de nouvelles IPs).
+# Le Service agit comme un load balancer interne :
+# il répartit le trafic entre tous les pods qui matchent le selector.
+apiVersion: v1
+kind: Service
+metadata:
+  name: banklens-api
+  namespace: banklens
+spec:
+  type: ClusterIP
+  # ClusterIP : accessible UNIQUEMENT depuis l'intérieur du cluster
+  # Les autres types :
+  # - NodePort : expose sur un port du node (pour le dev)
+  # - LoadBalancer : crée un load balancer cloud (AWS ALB/NLB)
+  selector:
+    app: banklens-api
+    # Cible tous les pods avec le label app=banklens-api
+  ports:
+    - port: 80           # Port du Service (ce que les autres services utilisent)
+      targetPort: 8000   # Port du container (où FastAPI écoute)
+      protocol: TCP
+      name: http

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: banklens-frontend
+  namespace: banklens
+spec:
+  type: ClusterIP
+  selector:
+    app: banklens-frontend
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP

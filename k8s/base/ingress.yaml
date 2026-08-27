@@ -1,0 +1,45 @@
+# L'Ingress est le "routeur" qui reçoit le trafic d'Internet
+# et le distribue aux bons Services selon l'URL.
+# Sur EKS, l'Ingress crée automatiquement un AWS ALB (Application Load Balancer).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banklens-ingress
+  namespace: banklens
+  annotations:
+    # Ces annotations disent à AWS quel type de load balancer créer
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # internet-facing : accessible depuis Internet (pas juste le VPC)
+    alb.ingress.kubernetes.io/target-type: ip
+    # target-type ip : l'ALB envoie directement aux IPs des pods (plus efficace)
+    alb.ingress.kubernetes.io/certificate-arn: <ACM_CERT_ARN>
+    # Le certificat SSL/TLS pour HTTPS (on le créera plus tard)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # Force la redirection HTTP → HTTPS
+spec:
+  rules:
+    - host: front.banklens.daemon-craft.ca
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: banklens-frontend
+                port:
+                  number: 80
+    - host: api-banklens.daemon-craft.ca
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: banklens-api
+                port:
+                  number: 80
+  # ROUTAGE :
+  # front.banklens.daemon-craft.ca → banklens-frontend (React/Nginx)
+  # api-banklens.daemon-craft.ca → banklens-api (FastAPI)
